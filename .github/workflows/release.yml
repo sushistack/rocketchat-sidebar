@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Update manifest version
+        run: |
+          jq --arg v "${{ steps.version.outputs.version }}" '.version = $v' manifest.json > manifest.tmp.json
+          mv manifest.tmp.json manifest.json
+
+      - name: Package extension
+        run: |
+          zip -r rocketchat-sidebar-${{ github.ref_name }}.zip \
+            manifest.json \
+            sidebar/ \
+            rules/ \
+            icons/*.png \
+            --exclude "*.DS_Store"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: |
+            ## Install
+
+            1. Firefox에서 `about:addons` → 톱니바퀴 → **Install Add-on From File** 선택
+            2. 다운로드한 `.zip` 파일 선택
+
+            > 서명 없이 설치하려면 Firefox Developer Edition 또는 Nightly 사용, 혹은 `about:config`에서 `xpinstall.signatures.required = false` 설정
+          files: rocketchat-sidebar-${{ github.ref_name }}.zip
+          draft: false
+          prerelease: false
